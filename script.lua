@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -12,21 +13,8 @@ local TargetPlayer = nil
 local Smoothness = 0.1
 local ESPBoxes = {}
 local UIVisible = true
-local ShowDistance = false
-local ESPDistanceLabels = {}
-
--- ESP Colors
-local ESPColors = {
-    Красный = Color3.new(1, 0, 0),
-    Зеленый = Color3.new(0, 1, 0),
-    Синий = Color3.new(0, 0, 1),
-    Желтый = Color3.new(1, 1, 0),
-    Фиолетовый = Color3.new(0.5, 0, 0.5),
-    Оранжевый = Color3.new(1, 0.5, 0)
-}
-
-local ESPColorNames = {"Красный", "Зеленый", "Синий", "Желтый", "Фиолетовый", "Оранжевый"}
-local CurrentESPColor = 1
+local Dragging = false
+local DragStartPos
 
 -- GUI
 local ScreenGui = Instance.new("ScreenGui")
@@ -43,7 +31,7 @@ MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
--- Title Bar
+-- Title Bar with Close Button
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 25)
 TitleBar.Position = UDim2.new(0, 0, 0, 0)
@@ -100,7 +88,7 @@ PlayerDropdown.Font = Enum.Font.Gotham
 PlayerDropdown.TextSize = 12
 PlayerDropdown.Parent = ContentFrame
 
--- Aimbot Toggle
+-- Aimbot Section
 local AimbotToggle = Instance.new("TextButton")
 AimbotToggle.Size = UDim2.new(1, -20, 0, 35)
 AimbotToggle.Position = UDim2.new(0, 10, 0, 80)
@@ -111,7 +99,7 @@ AimbotToggle.Font = Enum.Font.GothamBold
 AimbotToggle.TextSize = 14
 AimbotToggle.Parent = ContentFrame
 
--- ESP Toggle
+-- ESP Section
 local ESPToggle = Instance.new("TextButton")
 ESPToggle.Size = UDim2.new(1, -20, 0, 35)
 ESPToggle.Position = UDim2.new(0, 10, 0, 125)
@@ -122,7 +110,7 @@ ESPToggle.Font = Enum.Font.GothamBold
 ESPToggle.TextSize = 14
 ESPToggle.Parent = ContentFrame
 
--- ESP Color
+-- ESP Color Settings
 local ESPColorLabel = Instance.new("TextLabel")
 ESPColorLabel.Size = UDim2.new(1, -20, 0, 25)
 ESPColorLabel.Position = UDim2.new(0, 10, 0, 170)
@@ -197,7 +185,22 @@ StatusLabel.TextSize = 12
 StatusLabel.TextWrapped = true
 StatusLabel.Parent = ContentFrame
 
--- Functions
+-- ESP Variables
+local ESPColors = {
+    Red = Color3.new(1, 0, 0),
+    Green = Color3.new(0, 1, 0),
+    Blue = Color3.new(0, 0, 1),
+    Yellow = Color3.new(1, 1, 0),
+    Purple = Color3.new(0.5, 0, 0.5),
+    Orange = Color3.new(1, 0.5, 0)
+}
+
+local ESPColorNames = {"Красный", "Зеленый", "Синий", "Желтый", "Фиолетовый", "Оранжевый"}
+local CurrentESPColor = 1
+local ShowDistance = false
+local ESPDistanceLabels = {}
+
+-- Get Players for Dropdown
 function GetPlayers()
     local playerList = {}
     for _, player in pairs(Players:GetPlayers()) do
@@ -224,6 +227,7 @@ function StartAimbot()
         local humanoidRootPart = targetChar:FindFirstChild("HumanoidRootPart")
         if not humanoidRootPart then return end
         
+        -- Smooth aim calculation
         local camera = workspace.CurrentCamera
         local cameraPosition = camera.CFrame.Position
         local targetPosition = humanoidRootPart.Position
@@ -238,20 +242,14 @@ end
 
 -- ESP Function
 function UpdateESP()
+    -- Clear existing ESP
     for _, box in pairs(ESPBoxes) do
-        if box then
-            box:Destroy()
-        end
+        box:Destroy()
     end
     ESPBoxes = {}
     
-    for _, labelData in pairs(ESPDistanceLabels) do
-        if labelData.Connection then
-            labelData.Connection:Disconnect()
-        end
-        if labelData.Gui then
-            labelData.Gui:Destroy()
-        end
+    for _, label in pairs(ESPDistanceLabels) do
+        label:Destroy()
     end
     ESPDistanceLabels = {}
     
@@ -259,31 +257,30 @@ function UpdateESP()
     
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
-            local targetPart = player.Character:FindFirstChild("HumanoidRootPart") or 
-                             player.Character:FindFirstChild("Head") or
-                             player.Character:FindFirstChild("Torso")
-            
-            if targetPart then
+            local humanoidRootPart = player.Character:FindFirstChild("HumanoidRootPart")
+            if humanoidRootPart then
+                -- Create ESP Box
                 local espBox = Instance.new("BoxHandleAdornment")
                 espBox.Name = "ESP_" .. player.Name
-                espBox.Adornee = targetPart
+                espBox.Adornee = humanoidRootPart
                 espBox.AlwaysOnTop = true
                 espBox.ZIndex = 10
-                espBox.Size = Vector3.new(4, 6, 4)
+                espBox.Size = Vector3.new(3, 5, 3)
                 espBox.Transparency = 0.7
                 espBox.Color3 = player.Team == LocalPlayer.Team and Color3.new(0, 1, 0) or ESPColors[ESPColorNames[CurrentESPColor]]
-                espBox.Parent = targetPart
+                espBox.Parent = humanoidRootPart
                 
                 table.insert(ESPBoxes, espBox)
                 
+                -- Distance Label
                 if ShowDistance then
                     local distanceLabel = Instance.new("BillboardGui")
                     distanceLabel.Name = "Distance_" .. player.Name
-                    distanceLabel.Adornee = targetPart
+                    distanceLabel.Adornee = humanoidRootPart
                     distanceLabel.Size = UDim2.new(0, 100, 0, 40)
                     distanceLabel.StudsOffset = Vector3.new(0, 4, 0)
                     distanceLabel.AlwaysOnTop = true
-                    distanceLabel.Parent = targetPart
+                    distanceLabel.Parent = humanoidRootPart
                     
                     local label = Instance.new("TextLabel")
                     label.Size = UDim2.new(1, 0, 1, 0)
@@ -295,6 +292,7 @@ function UpdateESP()
                     label.TextSize = 14
                     label.Parent = distanceLabel
                     
+                    -- Update distance
                     local distanceConnection
                     distanceConnection = RunService.Heartbeat:Connect(function()
                         if player.Character and LocalPlayer.Character then
@@ -302,7 +300,7 @@ function UpdateESP()
                             local localRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                             if playerRoot and localRoot then
                                 local distance = (playerRoot.Position - localRoot.Position).Magnitude
-                                local steps = math.floor(distance / 3)
+                                local steps = math.floor(distance / 3) -- Примерное количество шагов
                                 label.Text = string.format("%.1f studs\n%d steps", distance, steps)
                             end
                         end
@@ -370,6 +368,7 @@ function ShowConfirmationDialog()
                 item.Connection:Disconnect()
             end
         end
+        UpdateESP()
     end)
     
     NoButton.MouseButton1Click:Connect(function()
@@ -377,7 +376,7 @@ function ShowConfirmationDialog()
     end)
 end
 
--- Player Dropdown
+-- Player Dropdown Menu
 local DropdownOpen = false
 local DropdownFrame
 
@@ -385,6 +384,7 @@ PlayerDropdown.MouseButton1Click:Connect(function()
     if DropdownOpen then
         if DropdownFrame then
             DropdownFrame:Destroy()
+            DropdownFrame = nil
         end
         DropdownOpen = false
         return
@@ -519,7 +519,7 @@ CloseButton.MouseButton1Click:Connect(function()
     ShowConfirmationDialog()
 end)
 
--- Hide/Show UI
+-- Hide/Show UI with Right Ctrl
 UserInputService.InputBegan:Connect(function(Input)
     if Input.KeyCode == Enum.KeyCode.RightControl then
         UIVisible = not UIVisible
@@ -527,39 +527,13 @@ UserInputService.InputBegan:Connect(function(Input)
     end
 end)
 
--- Auto ESP update
-local function setupCharacterESP(player)
-    if player.Character then
-        UpdateESP()
-    end
-    player.CharacterAdded:Connect(function()
-        wait(0.5)
-        UpdateESP()
-    end)
-end
-
-for _, player in pairs(Players:GetPlayers()) do
-    if player ~= LocalPlayer then
-        setupCharacterESP(player)
-    end
-end
-
-Players.PlayerAdded:Connect(function(player)
-    if player ~= LocalPlayer then
-        setupCharacterESP(player)
-    end
-end)
-
-Players.PlayerRemoving:Connect(function(player)
-    wait(0.1)
-    UpdateESP()
-end)
+-- Update ESP when players are added/removed
+Players.PlayerAdded:Connect(UpdateESP)
+Players.PlayerRemoving:Connect(UpdateESP)
 
 print("Aimbot + ESP GUI v2.0 загружен!")
-print("Все функции работают:")
-print("- Выбор игрока из списка")
-print("- Aimbot с настройкой плавности")
-print("- ESP с 6 цветами")
+print("Новые функции:")
+print("- Управление цветом ESP")
 print("- Показ дистанции и шагов")
 print("- Скрытие интерфейса (Правый Ctrl)")
 print("- Подтверждение закрытия")
