@@ -187,12 +187,12 @@ StatusLabel.Parent = ContentFrame
 
 -- ESP Variables
 local ESPColors = {
-    Red = Color3.new(1, 0, 0),
-    Green = Color3.new(0, 1, 0),
-    Blue = Color3.new(0, 0, 1),
-    Yellow = Color3.new(1, 1, 0),
-    Purple = Color3.new(0.5, 0, 0.5),
-    Orange = Color3.new(1, 0.5, 0)
+    Красный = Color3.new(1, 0, 0),
+    Зеленый = Color3.new(0, 1, 0),
+    Синий = Color3.new(0, 0, 1),
+    Желтый = Color3.new(1, 1, 0),
+    Фиолетовый = Color3.new(0.5, 0, 0.5),
+    Оранжевый = Color3.new(1, 0.5, 0)
 }
 
 local ESPColorNames = {"Красный", "Зеленый", "Синий", "Желтый", "Фиолетовый", "Оранжевый"}
@@ -244,12 +244,19 @@ end
 function UpdateESP()
     -- Clear existing ESP
     for _, box in pairs(ESPBoxes) do
-        box:Destroy()
+        if box then
+            box:Destroy()
+        end
     end
     ESPBoxes = {}
     
-    for _, label in pairs(ESPDistanceLabels) do
-        label:Destroy()
+    for _, labelData in pairs(ESPDistanceLabels) do
+        if labelData.Connection then
+            labelData.Connection:Disconnect()
+        end
+        if labelData.Gui and labelData.Gui.Parent then
+            labelData.Gui:Destroy()
+        end
     end
     ESPDistanceLabels = {}
     
@@ -257,18 +264,23 @@ function UpdateESP()
     
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
-            local humanoidRootPart = player.Character:FindFirstChild("HumanoidRootPart")
-            if humanoidRootPart then
+            -- Ищем любую часть тела для ESP
+            local targetPart = player.Character:FindFirstChild("HumanoidRootPart") or 
+                             player.Character:FindFirstChild("Head") or
+                             player.Character:FindFirstChild("Torso") or
+                             player.Character:FindFirstChild("UpperTorso")
+            
+            if targetPart then
                 -- Create ESP Box
                 local espBox = Instance.new("BoxHandleAdornment")
                 espBox.Name = "ESP_" .. player.Name
-                espBox.Adornee = humanoidRootPart
+                espBox.Adornee = targetPart
                 espBox.AlwaysOnTop = true
                 espBox.ZIndex = 10
-                espBox.Size = Vector3.new(3, 5, 3)
+                espBox.Size = targetPart.Size + Vector3.new(0.5, 0.5, 0.5)
                 espBox.Transparency = 0.7
                 espBox.Color3 = player.Team == LocalPlayer.Team and Color3.new(0, 1, 0) or ESPColors[ESPColorNames[CurrentESPColor]]
-                espBox.Parent = humanoidRootPart
+                espBox.Parent = targetPart
                 
                 table.insert(ESPBoxes, espBox)
                 
@@ -276,11 +288,11 @@ function UpdateESP()
                 if ShowDistance then
                     local distanceLabel = Instance.new("BillboardGui")
                     distanceLabel.Name = "Distance_" .. player.Name
-                    distanceLabel.Adornee = humanoidRootPart
+                    distanceLabel.Adornee = targetPart
                     distanceLabel.Size = UDim2.new(0, 100, 0, 40)
                     distanceLabel.StudsOffset = Vector3.new(0, 4, 0)
                     distanceLabel.AlwaysOnTop = true
-                    distanceLabel.Parent = humanoidRootPart
+                    distanceLabel.Parent = targetPart
                     
                     local label = Instance.new("TextLabel")
                     label.Size = UDim2.new(1, 0, 1, 0)
@@ -295,14 +307,22 @@ function UpdateESP()
                     -- Update distance
                     local distanceConnection
                     distanceConnection = RunService.Heartbeat:Connect(function()
-                        if player.Character and LocalPlayer.Character then
-                            local playerRoot = player.Character:FindFirstChild("HumanoidRootPart")
-                            local localRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if player.Character and LocalPlayer.Character and player.Character.Parent ~= nil then
+                            local playerRoot = player.Character:FindFirstChild("HumanoidRootPart") or 
+                                             player.Character:FindFirstChild("Head") or
+                                             player.Character:FindFirstChild("Torso")
+                            local localRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart") or 
+                                            LocalPlayer.Character:FindFirstChild("Head") or
+                                            LocalPlayer.Character:FindFirstChild("Torso")
                             if playerRoot and localRoot then
                                 local distance = (playerRoot.Position - localRoot.Position).Magnitude
-                                local steps = math.floor(distance / 3) -- Примерное количество шагов
+                                local steps = math.floor(distance / 3)
                                 label.Text = string.format("%.1f studs\n%d steps", distance, steps)
+                            else
+                                label.Text = "N/A"
                             end
+                        else
+                            label.Text = "N/A"
                         end
                     end)
                     
@@ -310,6 +330,25 @@ function UpdateESP()
                 end
             end
         end
+    end
+end
+
+-- Auto update ESP when characters appear
+local function setupCharacterESP(player)
+    if player.Character then
+        UpdateESP()
+    end
+    
+    player.CharacterAdded:Connect(function()
+        wait(1)
+        UpdateESP()
+    end)
+end
+
+-- Setup ESP for existing players
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        setupCharacterESP(player)
     end
 end
 
@@ -528,8 +567,16 @@ UserInputService.InputBegan:Connect(function(Input)
 end)
 
 -- Update ESP when players are added/removed
-Players.PlayerAdded:Connect(UpdateESP)
-Players.PlayerRemoving:Connect(UpdateESP)
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then
+        setupCharacterESP(player)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    wait(0.1)
+    UpdateESP()
+end)
 
 print("Aimbot + ESP GUI v2.0 загружен!")
 print("Новые функции:")
@@ -538,3 +585,4 @@ print("- Показ дистанции и шагов")
 print("- Скрытие интерфейса (Правый Ctrl)")
 print("- Подтверждение закрытия")
 print("- Перетаскивание окна")
+print("- Исправленный ESP")
