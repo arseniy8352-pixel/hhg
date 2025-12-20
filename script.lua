@@ -1,139 +1,170 @@
--- Aimbot + ESP Script for Roblox (Updated 2025)
+-- Aimbot + ESP (Roblox, 2025)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Variables
-local AimbotEnabled = false
-local ESPEnabled = false
-local TargetPlayer = nil
-local Smoothness = 0.1
-local ESPObjects = {} -- Храним ESP-объекты для очистки
-local UIVisible = true
-local Dragging = false
-local DragStartPos
+-- Настройки
+local Aimbot = {
+    Enabled = false,
+    Target = nil,
+    Smoothness = 0.1,
+    FOV = 100 -- радиус захвата цели (в studs)
+}
 
--- GUI (CoreGui + ResetOnSpawn = false)
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "AimbotGUI"
-ScreenGui.Parent = game:GetService("CoreGui")
+local ESP = {
+    Enabled = false,
+    Color = Color3.fromRGB(255, 0, 0),
+    ShowDistance = false
+}
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+ScreenGui.Name = "CheatGUI"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 350, 0, 500)
-MainFrame.Position = UDim2.new(0, 10, 0, 10)
+MainFrame.Size = UDim2.new(0, 300, 0, 400)
+MainFrame.Position = UDim2.new(0.02, 0, 0.5, 0)
+MainFrame.AnchorPoint = Vector2.new(0, 0.5)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.BorderSizePixel = 2
-MainFrame.BorderColor3 = Color3.fromRGB(0, 128, 255)
+MainFrame.BorderColor3 = Color3.fromRGB(0, 150, 255)
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
--- Title Bar
-local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 25)
-TitleBar.Position = UDim2.new(0, 0, 0, 0)
-TitleBar.BackgroundColor3 = Color3.fromRGB(0, 80, 160)
-TitleBar.BorderSizePixel = 0
-TitleBar.Parent = MainFrame
-
+-- Заголовок
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -30, 1, 0)
-Title.Position = UDim2.new(0, 5, 0, 0)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Position = UDim2.new(0, 0, 0, -30)
 Title.BackgroundTransparency = 1
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Text = "AIMBOT + ESP v3.0"
+Title.Text = "AIMBOT + ESP"
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 14
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = TitleBar
+Title.TextSize = 16
+Title.Parent = MainFrame
 
-local CloseButton = Instance.new("TextButton")
-CloseButton.Size = UDim2.new(0, 25, 0, 25)
-CloseButton.Position = UDim2.new(1, -25, 0, 0)
-CloseButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseButton.Text = "X"
-CloseButton.Font = Enum.Font.GothamBold
-CloseButton.TextSize = 14
-CloseButton.Parent = TitleBar
+-- Кнопки управления
+local AimbotBtn = Instance.new("TextButton")
+AimbotBtn.Size = UDim2.new(0.9, 0, 0, 40)
+AimbotBtn.Position = UDim2.new(0.05, 0, 0.15, 0)
+AimbotBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+AimbotBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+AimbotBtn.Text = "Aimbot: OFF"
+AimbotBtn.Font = Enum.Font.Gotham
+AimbotBtn.TextSize = 14
+AimbotBtn.Parent = MainFrame
 
--- Content
-local ContentFrame = Instance.new("Frame")
-ContentFrame.Size = UDim2.new(1, 0, 1, -25)
-ContentFrame.Position = UDim2.new(0, 0, 0, 25)
-ContentFrame.BackgroundTransparency = 1
-ContentFrame.Parent = MainFrame
-
--- Player List
-local PlayerListLabel = Instance.new("TextLabel")
-PlayerListLabel.Size = UDim2.new(1, -20, 0, 25)
-PlayerListLabel.Position = UDim2.new(0, 10, 0, 10)
-PlayerListLabel.BackgroundTransparency = 1
-PlayerListLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-PlayerListLabel.Text = "Выберите игрока:"
-PlayerListLabel.Font = Enum.Font.Gotham
-PlayerListLabel.TextSize = 14
-PlayerListLabel.Parent = ContentFrame
-
-local PlayerDropdown = Instance.new("TextButton")
-PlayerDropdown.Size = UDim2.new(1, -20, 0, 30)
-PlayerDropdown.Position = UDim2.new(0, 10, 0, 40)
-PlayerDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-PlayerDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
-PlayerDropdown.Text = "Нажмите для выбора"
-PlayerDropdown.Font = Enum.Font.Gotham
-PlayerDropdown.TextSize = 12
-PlayerDropdown.Parent = ContentFrame
+local ESPBtn = Instance.new("TextButton")
+ESPBtn.Size = UDim2.new(0.9, 0, 0, 40)
+ESPBtn.Position = UDim2.new(0.05, 0, 0.3, 0)
+ESPBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ESPBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPBtn.Text = "ESP: OFF"
+ESPBtn.Font = Enum.Font.Gotham
+ESPBtn.TextSize = 14
+ESPBtn.Parent = MainFrame
 
 
--- Aimbot Toggle
-local AimbotToggle = Instance.new("TextButton")
-AimbotToggle.Size = UDim2.new(1, -20, 0, 35)
-AimbotToggle.Position = UDim2.new(0, 10, 0, 80)
-AimbotToggle.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
-AimbotToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-AimbotToggle.Text = "AIMBOT: ВЫКЛ"
-AimbotToggle.Font = Enum.Font.GothamBold
-AimbotToggle.TextSize = 14
-AimbotToggle.Parent = ContentFrame
+-- Выбор цели
+local TargetLabel = Instance.new("TextLabel")
+TargetLabel.Size = UDim2.new(0.9, 0, 0, 30)
+TargetLabel.Position = UDim2.new(0.05, 0, 0.45, 0)
+TargetLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+TargetLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TargetLabel.Text = "Target: None"
+TargetLabel.Font = Enum.Font.Gotham
+TargetLabel.TextSize = 12
+TargetLabel.Parent = MainFrame
 
--- ESP Toggle
-local ESPToggle = Instance.new("TextButton")
-ESPToggle.Size = UDim2.new(1, -20, 0, 35)
-ESPToggle.Position = UDim2.new(0, 10, 0, 125)
-ESPToggle.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
-ESPToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-ESPToggle.Text = "ESP: ВЫКЛ"
-ESPToggle.Font = Enum.Font.GothamBold
-ESPToggle.TextSize = 14
-ESPToggle.Parent = ContentFrame
+-- Функции
 
--- ESP Color
-local ESPColorLabel = Instance.new("TextLabel")
-ESPColorLabel.Size = UDim2.new(1, -20, 0, 25)
-ESPColorLabel.Position = UDim2.new(0, 10, 0, 170)
-ESPColorLabel.BackgroundTransparency = 1
-ESPColorLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-ESPColorLabel.Text = "Цвет ESP:"
-ESPColorLabel.Font = Enum.Font.Gotham
-ESPColorLabel.TextSize = 12
-ESPColorLabel.Parent = ContentFrame
+local function GetNearestPlayer()
+    local nearest, distance = nil, Aimbot.FOV
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local root = player.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                local dist = (root.Position - LocalPlayer.Character.HumanoidRootPart.Position).magnitude
+                if dist < distance then
+                    nearest, distance = player, dist
+                end
+            end
+        end
+    end
+    return nearest
+end
 
-local ESPColorPicker = Instance.new("TextButton")
-ESPColorPicker.Size = UDim2.new(0, 80, 0, 25)
-ESPColorPicker.Position = UDim2.new(0, 10, 0, 195)
-ESPColorPicker.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-ESPColorPicker.TextColor3 = Color3.fromRGB(0, 0, 0)
-ESPColorPicker.Text = "Красный"
-ESPColorPicker.Font = Enum.Font.Gotham
-ESPColorPicker.TextSize = 11
-ESPColorPicker.Parent = ContentFrame
+local function UpdateAimbot()
+    if not Aimbot.Enabled or not LocalPlayer.Character then return end
+    
+    Aimbot.Target = GetNearestPlayer()
+    if Aimbot.Target then
+        TargetLabel.Text = "Target: " .. Aimbot.Target.Name
+        
+        local targetRoot = Aimbot.Target.Character:FindFirstChild("HumanoidRootPart")
+        if targetRoot then
+            local direction = (targetRoot.Position - Camera.CFrame.Position).unit
+            local newCFrame = CFrame.lookAt(Camera.CFrame.Position, Camera.CFrame.Position + direction)
+            Camera.CFrame = Camera.CFrame:Lerp(newCFrame, Aimbot.Smoothness)
+        end
+    else
+        TargetLabel.Text = "Target: None (Out of FOV)"
+    end
+end
 
--- Distance Toggle
-local ESPDistanceLabel = Instance.new("TextLabel")
-ESPDistanceLabel.Size = U
+local ESPObjects = {}
+local function UpdateESP()
+    -- Очищаем старые объекты
+    for obj in ipairs(ESPObjects) do
+        obj:Destroy()
+    end
+    ESPObjects = {}
+    
+    if not ESP.Enabled then return end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local head = player.Character:FindFirstChild("Head")
+            if head then
+                -- Создаём визуал ESP
+                local box = Instance.new("BoxHandleAdornment")
+                box.Adornee = head
+                box.AlwaysOnTop = true
+                box.ZIndex = 10
+                box.Size = Vector3.new(2, 2, 2)
+                box.Color3 = ESP.Color
+                box.Transparency = 0.5
+                box.Parent = workspace
+                table.insert(ESPObjects, box)
+
+                if ESP.ShowDistance then
+                    local distance = (head.Position - LocalPlayer.Character.Head.Position).magnitude
+                    local label = Instance.new("BillboardGui")
+                    label.Adornee = head
+                    label.Size = UDim2.new(0, 100, 0, 30)
+                    label.StudsOffset = Vector3.new(0, 2, 0)
+                    label.AlwaysOnTop = true
+                    label.Parent = workspace
+
+                    local text = Instance.new("TextLabel")
+                    text.Size = UDim2.new(1, 0, 1, 0)
+                    text.BackgroundTransparency = 1
+                    text.TextColor3 = ESP.Color
+                    text.Text = string.format("%.1f studs", distance)
+                    text.Font = Enum.Font.SourceSans
+                    text.TextSize = 14
+                    text.Parent = label
+                    table.insert(ESPObjects, label)
+                end
+            end
+        end
+    end
+end
+
+-- Обработчики событий
+AimbotBtn.MouseButton1Click:Connect(function()
+    Aimbot.Enabled = not Aimbot.Enabled
+    AimbotBtn.Text = "Aimbot: " .. (Aimbot.Enabled and "ON! or "
